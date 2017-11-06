@@ -43,7 +43,10 @@ $ ./demo/launch\_visualiser.sh
 Open a web browser and go to 'localhost:8080/visualiser' (default password is "password").
 #### Contributors
 Ricardo Fonseca
+
 Eric Vial
+
 Nuno Neves
+
 Fernando Ramos
 
