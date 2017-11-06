@@ -1,0 +1,42 @@
+### Instructions for generating patched floodlight jar file ###
+
+0. Requirements:
+- Java 8
+- ant
+- git
+
+
+1. Change directory to a floodlight git project
+1.1 If none exists, clone it:
+> git clone https://github.com/floodlight/floodlight.git
+> cd floodlight
+
+
+2. Checkout commit 9338ef0a7b22b54335724a408d4eebceeb79519c
+> git checkout 9338ef0a7b22b54335724a408d4eebceeb79519c
+
+
+3. Update web.ui submodule
+> git submodule init
+> git submodule update
+
+
+4. Apply patch file "floodlight.patch" found in this file's directory
+> git apply -p1 <path-to-floodlight.patch>
+
+
+5. Build floodlight and generate jar file
+> ant dist
+Jar file is target/floodlight.jar
+
+
+6. (Optional) Build sources jar file
+> ant dist-src
+Jar file is target/floodlight-sources.jar
+
+
+7. (Optional) Clean and undo patch
+> ant clean
+> git clean -f
+> git reset --hard
+

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+
+<project basedir="." name="varanus-common-lib">
+
+    <!--
+        When this file is included the basedir property is ignored, this hack is required to retrieve it.
+    -->
+    <dirname property="common.basedir" file="${ant.file.varanus-common-lib}" />
+
+    <property name="common.lib" location="${common.basedir}/lib" />
+
+</project>
+

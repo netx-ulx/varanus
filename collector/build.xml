@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+
+<project default="pack" basedir="." name="varanus-collector">
+
+    <!--
+        When this file is included the basedir property is ignored, this hack is required to retrieve it.
+    -->
+    <dirname property="collector.basedir" file="${ant.file.varanus-collector}" />
+
+    <property name="collector.target" location="${collector.basedir}/target" />
+    <property name="collector.build" location="${collector.target}/bin" />
+
+    <property name="collector.src" location="${collector.basedir}/src/main/java" />
+
+    <property name="collector.lib" location="${collector.basedir}/lib" />
+
+    <property name="collector.jar" location="${collector.target}/varanus-collector.jar" />
+    <property name="collector.main_class" value="net.varanus.collector.Main" />
+
+    <property name="ant.build.javac.source" value="1.8" />
+    <property name="ant.build.javac.target" value="1.8" />
+
+    <include file="${collector.basedir}/../mirroring-protocol/build.xml" as="mirroring" />
+    <include file="${collector.basedir}/../utils/build.xml" as="utils" />
+    <include file="${collector.basedir}/../common-lib/build.xml" as="common" />
+
+    <patternset id="collector-lib">
+        <include name="jackson-annotations-2.4.4.jar" />
+        <include name="jnetpcap-1.4.r1425/jnetpcap.jar" />
+        <include name="logback-classic-1.0.0.jar" />
+        <include name="logback-core-1.0.0.jar" />
+    </patternset>
+
+    <path id="collector-classpath">
+        <fileset dir="${collector.lib}">
+            <patternset refid="collector-lib" />
+        </fileset>
+        <fileset dir="${common.lib}">
+            <patternset refid="utils-common-lib" />
+        </fileset>
+        <pathelement path="${mirroring.build}" />
+        <pathelement path="${utils.build}" />
+    </path>
+
+    <target name="init" depends="mirroring.init,utils.init">
+        <mkdir dir="${collector.build}" />
+    </target>
+
+    <target name="compile" depends="init,mirroring.compile,utils.compile">
+        <javac includeAntRuntime="false"
+               classpathref="collector-classpath"
+               debug="true"
+               srcdir="${collector.src}"
+               destdir="${collector.build}">
+            <compilerarg value="-Xlint" />
+        </javac>
+    </target>
+
+    <target name="clean" depends="mirroring.clean,utils.clean">
+        <delete dir="${collector.target}" />
+    </target>
+
+    <target name="pack" depends="compile">
+        <jar destfile="${collector.jar}" filesetmanifest="mergewithoutmain">
+            <manifest>
+                <attribute name="Main-Class" value="${collector.main_class}" />
+                <attribute name="Class-Path" value="." />
+            </manifest>
+            <fileset dir="${collector.build}" />
+            <fileset dir="${mirroring.build}" />
+            <fileset dir="${utils.build}" />
+            <zipgroupfileset dir="${collector.lib}" excludes="META-INF/*.SF">
+                <patternset refid="collector-lib" />
+            </zipgroupfileset>
+            <zipgroupfileset dir="${common.lib}" excludes="META-INF/*.SF">
+                <patternset refid="utils-common-lib" />
+            </zipgroupfileset>
+        </jar>
+    </target>
+</project>
+

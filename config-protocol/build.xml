@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+
+<project default="compile" basedir="." name="varanus-config-protocol">
+
+    <!--
+        When this file is included the basedir property is ignored, this hack is required to retrieve it.
+    -->
+    <dirname property="config.basedir" file="${ant.file.varanus-config-protocol}" />
+
+    <property name="config.target" location="${config.basedir}/target" />
+    <property name="config.build" location="${config.target}/bin" />
+
+    <property name="config.src" location="${config.basedir}/src/main/java" />
+
+    <property name="ant.build.javac.source" value="1.8" />
+    <property name="ant.build.javac.target" value="1.8" />
+
+    <include file="${config.basedir}/../utils/build.xml" as="utils" />
+    <include file="${config.basedir}/../common-lib/build.xml" as="common" />
+
+    <path id="config.classpath">
+        <fileset dir="${common.lib}">
+            <patternset refid="utils-common-lib" />
+        </fileset>
+        <pathelement path="${utils.build}" />
+    </path>
+
+    <target name="init" depends="utils.init">
+        <mkdir dir="${config.build}" />
+    </target>
+
+    <target name="compile" depends="init,utils.compile">
+        <javac includeAntRuntime="false"
+               classpathref="config.classpath"
+               debug="true"
+               srcdir="${config.src}"
+               destdir="${config.build}">
+            <compilerarg value="-Xlint" />
+        </javac>
+    </target>
+
+    <target name="clean" depends="utils.clean">
+        <delete dir="${config.target}" />
+    </target>
+
+</project>
+

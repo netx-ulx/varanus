@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+
+<project default="pack" basedir="." name="varanus-xmlproxy">
+
+    <!--
+        When this file is included the basedir property is ignored, this hack is required to retrieve it.
+    -->
+    <dirname property="xmlproxy.basedir" file="${ant.file.varanus-xmlproxy}" />
+
+    <property name="xmlproxy.target" location="${xmlproxy.basedir}/target" />
+    <property name="xmlproxy.build" location="${xmlproxy.target}/bin" />
+
+    <property name="xmlproxy.src" location="${xmlproxy.basedir}/src/main/java" />
+
+    <property name="xmlproxy.lib" location="${xmlproxy.basedir}/lib" />
+
+    <property name="xmlproxy.jar" location="${xmlproxy.target}/varanus-xmlproxy.jar" />
+    <property name="xmlproxy.main_class" value="net.varanus.xmlproxy.Main" />
+
+    <property name="ant.build.javac.source" value="1.8" />
+    <property name="ant.build.javac.target" value="1.8" />
+
+    <include file="${xmlproxy.basedir}/../info-protocol/build.xml" as="info" />
+    <include file="${xmlproxy.basedir}/../config-protocol/build.xml" as="config" />
+    <include file="${xmlproxy.basedir}/../utils/build.xml" as="utils" />
+    <include file="${xmlproxy.basedir}/../common-lib/build.xml" as="common" />
+
+    <patternset id="xmlproxy.lib">
+        <include name="jackson-annotations-2.4.4.jar" />
+        <include name="logback-classic-1.0.0.jar" />
+        <include name="logback-core-1.0.0.jar" />
+    </patternset>
+
+    <path id="xmlproxy.classpath">
+        <fileset dir="${xmlproxy.lib}">
+            <patternset refid="xmlproxy.lib" />
+        </fileset>
+        <fileset dir="${common.lib}">
+            <patternset refid="utils-common-lib" />
+        </fileset>
+        <pathelement path="${info.build}" />
+        <pathelement path="${config.build}" />
+        <pathelement path="${utils.build}" />
+    </path>
+
+    <target name="init" depends="info.init,config.init,utils.init">
+        <mkdir dir="${xmlproxy.build}" />
+    </target>
+
+    <target name="compile" depends="init,info.compile,config.compile,utils.compile">
+        <javac includeAntRuntime="false"
+               classpathref="xmlproxy.classpath"
+               debug="true"
+               srcdir="${xmlproxy.src}"
+               destdir="${xmlproxy.build}">
+            <compilerarg value="-Xlint" />
+        </javac>
+    </target>
+
+    <target name="clean" depends="info.clean,config.clean,utils.clean">
+        <delete dir="${xmlproxy.target}" />
+    </target>
+
+    <target name="pack" depends="compile">
+        <jar destfile="${xmlproxy.jar}" filesetmanifest="mergewithoutmain">
+            <manifest>
+                <attribute name="Main-Class" value="${xmlproxy.main_class}" />
+                <attribute name="Class-Path" value="." />
+            </manifest>
+            <fileset dir="${xmlproxy.build}" />
+            <fileset dir="${info.build}" />
+            <fileset dir="${config.build}" />
+            <fileset dir="${utils.build}" />
+            <zipgroupfileset dir="${xmlproxy.lib}" excludes="META-INF/*.SF">
+                <patternset refid="xmlproxy.lib" />
+            </zipgroupfileset>
+            <zipgroupfileset dir="${common.lib}" excludes="META-INF/*.SF">
+                <patternset refid="utils-common-lib" />
+            </zipgroupfileset>
+        </jar>
+    </target>
+</project>
+

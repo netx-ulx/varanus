@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+
+<project default="pack" basedir="." name="varanus-sdncontroller">
+
+    <!--
+        When this file is included the basedir property is ignored, this hack is required to retrieve it.
+    -->
+    <dirname property="sdncontroller.basedir" file="${ant.file.varanus-sdncontroller}" />
+
+    <property name="sdncontroller.target" location="${sdncontroller.basedir}/target" />
+    <property name="sdncontroller.build" location="${sdncontroller.target}/bin" />
+
+    <property name="sdncontroller.src" location="${sdncontroller.basedir}/src/main/java" />
+    <property name="sdncontroller.resources" location="${sdncontroller.basedir}/src/main/resources/" />
+
+    <property name="sdncontroller.lib" location="${sdncontroller.basedir}/lib" />
+
+    <property name="sdncontroller.jar" location="${sdncontroller.target}/varanus-sdncontroller.jar" />
+
+    <property name="ant.build.javac.source" value="1.8" />
+    <property name="ant.build.javac.target" value="1.8" />
+
+    <include file="${sdncontroller.basedir}/../mirroring-protocol/build.xml" as="mirroring" />
+    <include file="${sdncontroller.basedir}/../info-protocol/build.xml" as="info" />
+    <include file="${sdncontroller.basedir}/../config-protocol/build.xml" as="config" />
+    <include file="${sdncontroller.basedir}/../utils/build.xml" as="utils" />
+    <include file="${sdncontroller.basedir}/../common-lib/build.xml" as="common" />
+
+    <patternset id="sdncontroller-lib">
+        <include name="openflowj-2.1.0-patched-nicira.jar" />
+    </patternset>
+
+    <patternset id="sdncontroller-floodlight-lib">
+        <include name="floodlight.jar" />
+    </patternset>
+
+    <patternset id="sdncontroller-common-lib">
+        <patternset refid="utils-common-lib" />
+        <exclude name="openflowj-2.0.0-SNAPSHOT.jar" />
+    </patternset>
+
+    <path id="sdncontroller-classpath">
+        <fileset dir="${sdncontroller.lib}">
+            <patternset refid="sdncontroller-lib" />
+        </fileset>
+        <fileset dir="${sdncontroller.lib}">
+            <patternset refid="sdncontroller-floodlight-lib" />
+        </fileset>
+        <fileset dir="${common.lib}">
+            <patternset refid="sdncontroller-common-lib" />
+        </fileset>
+        <pathelement path="${mirroring.build}" />
+        <pathelement path="${info.build}" />
+        <pathelement path="${config.build}" />
+        <pathelement path="${utils.build}" />
+    </path>
+
+    <target name="init" depends="mirroring.init,info.init,config.init,utils.init">
+        <mkdir dir="${sdncontroller.build}" />
+    </target>
+
+    <target name="compile" depends="init,mirroring.compile,info.compile,config.compile,utils.compile">
+        <javac includeAntRuntime="false"
+               classpathref="sdncontroller-classpath"
+               debug="true"
+               srcdir="${sdncontroller.src}"
+               destdir="${sdncontroller.build}">
+            <compilerarg value="-Xlint" />
+        </javac>
+    </target>
+
+    <target name="clean" depends="mirroring.clean,info.clean,config.clean,utils.clean">
+        <delete dir="${sdncontroller.target}" />
+    </target>
+
+    <target name="pack" depends="compile">
+        <jar destfile="${sdncontroller.jar}" filesetmanifest="mergewithoutmain">
+            <fileset dir="${sdncontroller.build}" />
+            <fileset dir="${mirroring.build}" />
+            <fileset dir="${info.build}" />
+            <fileset dir="${config.build}" />
+            <fileset dir="${utils.build}" />
+            <fileset dir="${sdncontroller.resources}" />
+            <zipgroupfileset dir="${sdncontroller.lib}" excludes="META-INF/*.SF">
+                <patternset refid="sdncontroller-lib" />
+            </zipgroupfileset>
+            <zipgroupfileset dir="${common.lib}" excludes="META-INF/*.SF">
+                <patternset refid="sdncontroller-common-lib" />
+            </zipgroupfileset>
+        </jar>
+    </target>
+</project>
+

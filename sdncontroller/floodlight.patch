@@ -1,0 +1,790 @@
+diff -ruN old/src/main/java/net/floodlightcontroller/core/IFloodlightProviderService.java new/src/main/java/net/floodlightcontroller/core/IFloodlightProviderService.java
+--- old/src/main/java/net/floodlightcontroller/core/IFloodlightProviderService.java	2017-01-24 16:59:29.772919820 +0000
++++ new/src/main/java/net/floodlightcontroller/core/IFloodlightProviderService.java	2017-01-24 16:37:30.296773491 +0000
+@@ -87,12 +87,32 @@
+     public void removeOFMessageListener(OFType type, IOFMessageListener listener);
+ 
+     /**
++     * Adds a pre-outgoing OpenFlow message handler
++     * @param type The OFType the component wants to handle
++     * @param handler The component that wants to handle pre-outgoing messages
++     */
++    public void addPreOutgoingOFMessageHandler(OFType type, IPreOutgoingOFMessageHandler handler);
++
++    /**
++     * Removes a pre-outgoing OpenFlow message handler
++     * @param type The OFType the component wants to handle
++     * @param handler The component that no longer wants to handle pre-outgoing messages
++     */
++    public void removePreOutgoingOFMessageHandler(OFType type, IPreOutgoingOFMessageHandler handler);
++
++    /**
+      * Return a non-modifiable list of all current listeners
+      * @return listeners
+      */
+     public Map<OFType, List<IOFMessageListener>> getListeners();
+ 
+     /**
++     * Return a non-modifiable map of all current pre-outgoing message handlers.
++     * @return
++     */
++    public Map<OFType, List<IPreOutgoingOFMessageHandler>> getPreOutgoingHandlers();
++
++    /**
+      * Get the current role of the controller
+      */
+     public HARole getRole();
+@@ -161,6 +181,15 @@
+     public void handleOutgoingMessage(IOFSwitch sw, OFMessage m);
+ 
+     /**
++     * Process written messages through the message handlers for the controller before they are sent to switches
++     * @param sw The switch being written to
++     * @param m the message
++     * @return the message to send instead after processing is done by all registered handlers
++     * @throws NullPointerException if switch or msg is null
++     */
++    public OFMessage handlePreOutgoingMessage(IOFSwitch sw, OFMessage m);
++
++    /**
+      * Run the main I/O loop of the Controller.
+      */
+     @Override
+diff -ruN old/src/main/java/net/floodlightcontroller/core/internal/Controller.java new/src/main/java/net/floodlightcontroller/core/internal/Controller.java
+--- old/src/main/java/net/floodlightcontroller/core/internal/Controller.java	2017-01-24 16:59:29.772919820 +0000
++++ new/src/main/java/net/floodlightcontroller/core/internal/Controller.java	2017-01-24 16:40:27.864810098 +0000
+@@ -51,6 +51,7 @@
+ import net.floodlightcontroller.core.IOFMessageListener;
+ import net.floodlightcontroller.core.IOFSwitch;
+ import net.floodlightcontroller.core.IOFSwitchListener;
++import net.floodlightcontroller.core.IPreOutgoingOFMessageHandler;
+ import net.floodlightcontroller.core.LogicalOFMessageCategory;
+ import net.floodlightcontroller.core.PortChangeType;
+ import net.floodlightcontroller.core.RoleInfo;
+@@ -104,6 +105,7 @@
+     static final String ERROR_DATABASE = "The controller could not communicate with the system database.";
+ 
+     protected ConcurrentMap<OFType, ListenerDispatcher<OFType,IOFMessageListener>> messageListeners;
++    protected ConcurrentMap<OFType, ListenerDispatcher<OFType, IPreOutgoingOFMessageHandler>> preOutMessageHandlers;
+     
+     // paag
+     protected ConcurrentLinkedQueue<IControllerCompletionListener> completionListeners;
+@@ -574,6 +576,26 @@
+         }
+     }
+ 
++    @Override
++    public synchronized void addPreOutgoingOFMessageHandler(OFType type, IPreOutgoingOFMessageHandler handler) {
++        ListenerDispatcher<OFType, IPreOutgoingOFMessageHandler> ldd =
++            preOutMessageHandlers.get(type);
++        if (ldd == null) {
++            ldd = new ListenerDispatcher<>();
++            preOutMessageHandlers.put(type, ldd);
++        }
++        ldd.addListener(type, handler);
++    }
++
++    @Override
++    public void removePreOutgoingOFMessageHandler(OFType type, IPreOutgoingOFMessageHandler handler) {
++        ListenerDispatcher<OFType, IPreOutgoingOFMessageHandler> ldd =
++            preOutMessageHandlers.get(type);
++        if (ldd != null) {
++            ldd.removeListener(handler);
++        }
++    }
++
+     private void logListeners() {
+         for (Map.Entry<OFType, ListenerDispatcher<OFType, IOFMessageListener>> entry : messageListeners.entrySet()) {
+             OFType type = entry.getKey();
+@@ -599,10 +621,32 @@
+         log.debug(sb.toString());
+     }
+ 
++    private void logPreOutgoingHandlers() {
++        for (Map.Entry<OFType, ListenerDispatcher<OFType, IPreOutgoingOFMessageHandler>> entry
++            : preOutMessageHandlers.entrySet()) {
++            OFType type = entry.getKey();
++            ListenerDispatcher<OFType, IPreOutgoingOFMessageHandler> ldd = entry.getValue();
++
++            StringBuilder sb = new StringBuilder();
++            sb.append("Pre-Outgoing OFHandlers for ");
++            sb.append(type);
++            sb.append(": ");
++            for (IPreOutgoingOFMessageHandler h : ldd.getOrderedListeners()) {
++                sb.append(h.getName());
++                sb.append(",");
++            }
++            log.debug(sb.toString());
++        }
++    }
++
+     public void removeOFMessageListeners(OFType type) {
+         messageListeners.remove(type);
+     }
+ 
++    public void removePreOutgoingOFMessageHandlers(OFType type) {
++        preOutMessageHandlers.remove(type);
++    }
++
+     @Override
+     public Map<OFType, List<IOFMessageListener>> getListeners() {
+         Map<OFType, List<IOFMessageListener>> lers =
+@@ -614,6 +658,17 @@
+     }
+ 
+     @Override
++    public Map<OFType, List<IPreOutgoingOFMessageHandler>> getPreOutgoingHandlers() {
++        Map<OFType, List<IPreOutgoingOFMessageHandler>> hers =
++            new HashMap<>();
++        for (Entry<OFType, ListenerDispatcher<OFType, IPreOutgoingOFMessageHandler>> e
++            : preOutMessageHandlers.entrySet()) {
++            hers.put(e.getKey(), e.getValue().getOrderedListeners());
++        }
++        return Collections.unmodifiableMap(hers);
++    }
++
++    @Override
+     public void handleOutgoingMessage(IOFSwitch sw, OFMessage m) {
+         if (sw == null)
+             throw new NullPointerException("Switch must not be null");
+@@ -636,6 +691,28 @@
+         }
+     }
+ 
++    @Override
++    public OFMessage handlePreOutgoingMessage(IOFSwitch sw, OFMessage m) {
++        if (sw == null)
++            throw new NullPointerException("Switch must not be null");
++        if (m == null)
++            throw new NullPointerException("OFMessage must not be null");
++
++        OFMessage processed = m;
++        FloodlightContext bc = new FloodlightContext();
++
++        ListenerDispatcher<OFType, IPreOutgoingOFMessageHandler> ldd = preOutMessageHandlers.get(m.getType());
++        if (ldd != null) {
++            for (IPreOutgoingOFMessageHandler handler : ldd.getOrderedListeners()) {
++                if ((processed = handler.handlePreOutgoing(sw, processed, bc)) == null) {
++                    break;
++                }
++            }
++        }
++
++        return processed;
++    }
++
+     // **************
+     // Initialization
+     // **************
+@@ -686,6 +763,7 @@
+ 
+         if (log.isDebugEnabled()) {
+             logListeners();
++            logPreOutgoingHandlers();
+         }
+ 
+         while (true) {
+@@ -767,6 +845,7 @@
+         // These data structures are initialized here because other
+         // module's startUp() might be called before ours        
+         this.messageListeners = new ConcurrentHashMap<OFType, ListenerDispatcher<OFType, IOFMessageListener>>();
++        this.preOutMessageHandlers = new ConcurrentHashMap<>();
+         this.haListeners = new ListenerDispatcher<HAListenerTypeMarker, IHAListener>();
+         this.controllerNodeIPsCache = new HashMap<String, String>();
+         this.updates = new LinkedBlockingQueue<IUpdate>();
+diff -ruN old/src/main/java/net/floodlightcontroller/core/internal/IOFSwitchManager.java new/src/main/java/net/floodlightcontroller/core/internal/IOFSwitchManager.java
+--- old/src/main/java/net/floodlightcontroller/core/internal/IOFSwitchManager.java	2017-01-24 16:59:29.772919820 +0000
++++ new/src/main/java/net/floodlightcontroller/core/internal/IOFSwitchManager.java	2017-01-24 15:11:45.551598872 +0000
+@@ -56,7 +56,7 @@
+      * @param bContext the Floodlight context of the message, normally null in this case.
+      */
+     void handleMessage(IOFSwitchBackend sw, OFMessage m, FloodlightContext bContext);
+-    
++
+     /**
+      * Process written messages through the message listeners for the controller
+      * @param sw The switch being written to
+@@ -65,6 +65,14 @@
+     public void handleOutgoingMessage(IOFSwitch sw, OFMessage m);
+ 
+     /**
++     * Process written messages through the message handlers for the controller before they are sent to switches
++     * @param sw The switch being written to
++     * @param m the message
++     * @return the message to send instead after processing is done by all registered handlers
++     */
++    public OFMessage handlePreOutgoingMessage(IOFSwitch sw, OFMessage m);
++
++    /**
+      * Gets an unmodifiable collection of OFSwitchHandshakeHandlers
+      * @return an unmodifiable collection of OFSwitchHandshakeHandlers
+      */
+diff -ruN old/src/main/java/net/floodlightcontroller/core/internal/OFSwitch.java new/src/main/java/net/floodlightcontroller/core/internal/OFSwitch.java
+--- old/src/main/java/net/floodlightcontroller/core/internal/OFSwitch.java	2017-01-24 16:59:29.772919820 +0000
++++ new/src/main/java/net/floodlightcontroller/core/internal/OFSwitch.java	2017-01-24 16:41:35.180842438 +0000
+@@ -864,14 +864,24 @@
+ 		if (log.isDebugEnabled()) {
+ 			log.debug("MESSAGES: {}, VALID: {}, INVALID: {}", new Object[] { msgList, validMsgs, invalidMsgs});
+ 		}
+-		/* Try to write all valid messages */
+-		Collection<OFMessage> unsent = conn.write(validMsgs);
++
++		/* Process valid messages before being written */
++		Collection<OFMessage> validProcessedMsgs = new ArrayList<OFMessage>();
+ 		for (OFMessage m : validMsgs) {
++		    OFMessage processed = switchManager.handlePreOutgoingMessage(this, m);
++		    if (processed != null) {
++		        validProcessedMsgs.add(processed);
++		    }
++		}
++
++		/* Try to write all valid pre-processed messages */
++		Collection<OFMessage> unsent = conn.write(validProcessedMsgs);
++		for (OFMessage m : validProcessedMsgs) {
+ 			if (!unsent.contains(m)) {
+ 				switchManager.handleOutgoingMessage(this, m);
+ 			}
+ 		}
+-		
++
+ 		/* Collect invalid and unsent messages */
+ 		Collection<OFMessage> ret = null;
+ 		if (!unsent.isEmpty()) {
+@@ -1340,4 +1350,4 @@
+ 	public U64 getLatency() {
+ 		return this.connections.get(OFAuxId.MAIN).getLatency();
+ 	}
+-}
+\ No newline at end of file
++}
+diff -ruN old/src/main/java/net/floodlightcontroller/core/internal/OFSwitchManager.java new/src/main/java/net/floodlightcontroller/core/internal/OFSwitchManager.java
+--- old/src/main/java/net/floodlightcontroller/core/internal/OFSwitchManager.java	2017-01-24 16:59:29.776919808 +0000
++++ new/src/main/java/net/floodlightcontroller/core/internal/OFSwitchManager.java	2017-01-24 15:11:45.551598872 +0000
+@@ -503,6 +503,11 @@
+ 		floodlightProvider.handleOutgoingMessage(sw, m);
+ 	}
+ 
++    @Override
++    public OFMessage handlePreOutgoingMessage(IOFSwitch sw, OFMessage m) {
++        return floodlightProvider.handlePreOutgoingMessage(sw, m);
++    }
++
+ 	@Override
+ 	public void addOFSwitchDriver(String manufacturerDescriptionPrefix,
+ 			IOFSwitchDriver driver) {
+diff -ruN old/src/main/java/net/floodlightcontroller/core/IPreOutgoingOFMessageHandler.java new/src/main/java/net/floodlightcontroller/core/IPreOutgoingOFMessageHandler.java
+--- old/src/main/java/net/floodlightcontroller/core/IPreOutgoingOFMessageHandler.java	1970-01-01 01:00:00.000000000 +0100
++++ new/src/main/java/net/floodlightcontroller/core/IPreOutgoingOFMessageHandler.java	2017-01-24 15:11:45.535598739 +0000
+@@ -0,0 +1,34 @@
++package net.floodlightcontroller.core;
++
++
++import javax.annotation.CheckForNull;
++import javax.annotation.ParametersAreNonnullByDefault;
++
++import org.projectfloodlight.openflow.protocol.OFMessage;
++import org.projectfloodlight.openflow.protocol.OFType;
++
++
++/**
++ *
++ */
++@ParametersAreNonnullByDefault
++public interface IPreOutgoingOFMessageHandler extends IListener<OFType>
++{
++    /**
++     * This is the method Floodlight uses to call handlers with outgoing
++     * OpenFlow messages before they are sent to
++     * switches.
++     *
++     * @param sw
++     *            the OpenFlow switch to which this message will be sent
++     * @param msg
++     *            the outgoing message
++     * @param cntx
++     *            a Floodlight message context object you can use to pass
++     *            information between handlers
++     * @return a new message to send instead (it can be the same as the one
++     *         provided), or {@code null} to abort the
++     *         sending operation
++     */
++    public @CheckForNull OFMessage handlePreOutgoing( IOFSwitch sw, OFMessage msg, FloodlightContext cntx );
++}
+diff -ruN old/src/main/java/net/floodlightcontroller/core/util/OFUtils.java new/src/main/java/net/floodlightcontroller/core/util/OFUtils.java
+--- old/src/main/java/net/floodlightcontroller/core/util/OFUtils.java	2017-01-24 16:59:29.776919808 +0000
++++ new/src/main/java/net/floodlightcontroller/core/util/OFUtils.java	2017-01-24 15:11:45.551598872 +0000
+@@ -18,6 +18,7 @@
+ import org.projectfloodlight.openflow.types.OFPort;
+ import org.projectfloodlight.openflow.types.OFVlanVidMatch;
+ import org.projectfloodlight.openflow.types.TransportPort;
++import org.projectfloodlight.openflow.types.U16;
+ import org.projectfloodlight.openflow.types.U8;
+ import org.projectfloodlight.openflow.types.VlanPcp;
+ 
+@@ -44,10 +45,10 @@
+         packetDataBB.get(dataLayerSource);
+         builder.setExact(MatchField.ETH_SRC, MacAddress.of(dataLayerSource));
+         // dl type
+-        short dataLayerType = packetDataBB.getShort();
++        int dataLayerType = U16.f(packetDataBB.getShort());
+         builder.setExact(MatchField.ETH_TYPE, EthType.of(dataLayerType));
+ 
+-        if (dataLayerType != (short) 0x8100) { // need cast to avoid signed
++        if (dataLayerType != 0x8100) {
+             // bug
+             builder.setExact(MatchField.VLAN_VID, OFVlanVidMatch.UNTAGGED);
+             builder.setExact(MatchField.VLAN_PCP, VlanPcp.NONE);
+@@ -56,7 +57,7 @@
+             scratch = packetDataBB.getShort();
+             builder.setExact(MatchField.VLAN_VID, OFVlanVidMatch.ofVlan(0xfff & scratch));
+             builder.setExact(MatchField.VLAN_PCP, VlanPcp.of((byte)((0xe000 & scratch) >> 13)));
+-            dataLayerType = packetDataBB.getShort();
++            dataLayerType = U16.f(packetDataBB.getShort());
+         }
+ 
+         short networkProtocol;
+@@ -76,7 +77,7 @@
+             builder.setExact(MatchField.IP_DSCP, IpDscp.of((byte) ((0xfc & scratch) >> 2)));
+             // nw protocol
+             packetDataBB.position(packetDataBB.position() + 7);
+-            networkProtocol = packetDataBB.get();
++            networkProtocol = U8.f(packetDataBB.get());
+             builder.setExact(MatchField.IP_PROTO, IpProtocol.of(networkProtocol));
+             // nw src
+             packetDataBB.position(packetDataBB.position() + 2);
+@@ -101,19 +102,19 @@
+             case 0x06:
+                 // tcp
+                 // tcp src
+-                port = packetDataBB.getShort();
++                port = U16.f(packetDataBB.getShort());
+                 builder.setExact(MatchField.TCP_SRC, TransportPort.of(port));
+                 // tcp dest
+-                port = packetDataBB.getShort();
++                port = U16.f(packetDataBB.getShort());
+                 builder.setExact(MatchField.TCP_DST, TransportPort.of(port));
+                 break;
+             case 0x11:
+                 // udp
+                 // udp src
+-                port = packetDataBB.getShort();
++                port = U16.f(packetDataBB.getShort());
+                 builder.setExact(MatchField.UDP_SRC, TransportPort.of(port));
+                 // udp dest
+-                port = packetDataBB.getShort();
++                port = U16.f(packetDataBB.getShort());
+                 builder.setExact(MatchField.UDP_DST, TransportPort.of(port));
+                 break;
+             default:
+diff -ruN old/src/main/java/net/floodlightcontroller/util/ActionUtils.java new/src/main/java/net/floodlightcontroller/util/ActionUtils.java
+--- old/src/main/java/net/floodlightcontroller/util/ActionUtils.java	2017-01-24 16:59:29.776919808 +0000
++++ new/src/main/java/net/floodlightcontroller/util/ActionUtils.java	2017-01-24 16:43:09.176903662 +0000
+@@ -1,13 +1,17 @@
+ package net.floodlightcontroller.util;
+ 
+ import java.util.ArrayDeque;
++import java.util.ArrayList;
++import java.util.Collections;
+ import java.util.LinkedList;
+ import java.util.List;
++import java.util.Optional;
+ import java.util.regex.Matcher;
+ import java.util.regex.Pattern;
+ 
+ import org.projectfloodlight.openflow.protocol.OFFactories;
+ import org.projectfloodlight.openflow.protocol.OFFlowMod;
++import org.projectfloodlight.openflow.protocol.OFInstructionType;
+ import org.projectfloodlight.openflow.protocol.OFVersion;
+ import org.projectfloodlight.openflow.protocol.action.OFAction;
+ import org.projectfloodlight.openflow.protocol.action.OFActionEnqueue;
+@@ -34,6 +38,8 @@
+ import org.projectfloodlight.openflow.protocol.action.OFActionSetTpSrc;
+ import org.projectfloodlight.openflow.protocol.action.OFActionSetVlanPcp;
+ import org.projectfloodlight.openflow.protocol.action.OFActionSetVlanVid;
++import org.projectfloodlight.openflow.protocol.instruction.OFInstruction;
++import org.projectfloodlight.openflow.protocol.instruction.OFInstructionApplyActions;
+ import org.projectfloodlight.openflow.protocol.oxm.OFOxmArpOp;
+ import org.projectfloodlight.openflow.protocol.oxm.OFOxmArpSha;
+ import org.projectfloodlight.openflow.protocol.oxm.OFOxmArpSpa;
+@@ -92,6 +98,8 @@
+ import org.projectfloodlight.openflow.types.VlanVid;
+ import org.slf4j.Logger;
+ 
++import com.google.common.collect.ImmutableList;
++
+ /**
+  * OFAction helper functions. Use with any OpenFlowJ-Loxi Action.
+  * String utility functions for converting OFActions to and from
+@@ -142,6 +150,73 @@
+ 	 * set-field operations to be consistent.
+ 	 */
+ 
++	public static List<OFAction> getActions(OFFlowMod flowMod) {
++
++	    return org.projectfloodlight.openflow.util.ActionUtils.getActions(flowMod);
++	}
++
++	public static List<OFAction> getActions(OFFlowMod.Builder builder) {
++
++	    if(builder.getVersion() == OFVersion.OF_10) {
++            return builder.getActions();
++	    }
++	    else {
++	        List<OFInstruction> instructions = builder.getInstructions();
++	        if (instructions == null) {
++	            return Collections.emptyList();
++	        }
++
++	        return instructions.stream()
++	            .filter(instr -> instr.getType().equals(OFInstructionType.APPLY_ACTIONS))
++	            .findFirst()
++	            .map(instr -> ((OFInstructionApplyActions)instr).getActions())
++	            .orElse(Collections.emptyList());
++	    }
++	}
++
++	public static <T extends OFFlowMod.Builder> T setActions(T builder, List<OFAction> actions) {
++
++	    if (actions != null) {
++	        if(builder.getVersion() == OFVersion.OF_10) {
++	            builder.setActions(actions);
++	        }
++	        else {
++	            List<OFInstruction> instructions = builder.getInstructions();
++	            if (instructions == null) {
++	                instructions = new ArrayList<>();
++	            }
++	            else if (instructions.isEmpty() || instructions instanceof ImmutableList<?>) {
++	                instructions = new ArrayList<>(instructions); // safeguard against immutable lists
++	            }
++
++	            Optional<OFInstruction> optApplyActions = instructions.stream()
++	                .filter(instr -> instr.getType().equals(OFInstructionType.APPLY_ACTIONS))
++	                .findFirst();
++
++	            if (optApplyActions.isPresent()) {
++	                OFInstructionApplyActions oldAA = (OFInstructionApplyActions)optApplyActions.get();
++	                OFInstructionApplyActions newAA = oldAA.createBuilder()
++	                    .setActions(actions)
++	                    .build();
++
++	                Collections.replaceAll(instructions, oldAA, newAA);
++	            }
++	            else {
++	                OFInstructionApplyActions aa = OFFactories.getFactory(builder.getVersion())
++	                    .instructions().buildApplyActions()
++	                    .setActions(actions)
++	                    .build();
++
++	                instructions.add(aa);
++	            }
++
++	            builder.setInstructions(instructions);
++	        }
++	    }
++
++	    return builder;
++	}
++
+ 	/**
+ 	 * Returns a String representation of all the OpenFlow actions.
+ 	 * @param actions; A list of OFActions to encode into one string
+@@ -849,7 +924,7 @@
+ 				}
+ 			}
+ 			log.debug("actions: {}", actions);
+-			fmb.setActions(actions);
++			setActions(fmb, actions);
+ 		} else {
+ 			log.debug("actions not found --> drop");
+ 		}		
+diff -ruN old/src/main/java/net/floodlightcontroller/util/FlowModUtils.java new/src/main/java/net/floodlightcontroller/util/FlowModUtils.java
+--- old/src/main/java/net/floodlightcontroller/util/FlowModUtils.java	2017-01-24 16:59:29.776919808 +0000
++++ new/src/main/java/net/floodlightcontroller/util/FlowModUtils.java	2017-01-24 15:11:45.555598905 +0000
+@@ -59,8 +59,7 @@
+ 					.setXid(fm.getXid())
+ 					.build();
+ 		} else {
+-			return b.setActions(fm.getActions())
+-					.setBufferId(fm.getBufferId())
++			return b.setBufferId(fm.getBufferId())
+ 					.setCookie(fm.getCookie())
+ 					.setCookieMask(fm.getCookieMask()) // added in OF1.1
+ 					.setFlags(fm.getFlags())
+@@ -97,8 +96,7 @@
+ 					.setXid(fm.getXid())
+ 					.build();
+ 		} else {
+-			return b.setActions(fm.getActions())
+-					.setBufferId(fm.getBufferId())
++			return b.setBufferId(fm.getBufferId())
+ 					.setCookie(fm.getCookie())
+ 					.setCookieMask(fm.getCookieMask()) // added in OF1.1
+ 					.setFlags(fm.getFlags())
+@@ -135,8 +133,7 @@
+ 					.setXid(fm.getXid())
+ 					.build();
+ 		} else {
+-			return b.setActions(fm.getActions())
+-					.setBufferId(fm.getBufferId())
++			return b.setBufferId(fm.getBufferId())
+ 					.setCookie(fm.getCookie())
+ 					.setCookieMask(fm.getCookieMask()) // added in OF1.1
+ 					.setFlags(fm.getFlags())
+@@ -173,8 +170,7 @@
+ 					.setXid(fm.getXid())
+ 					.build();
+ 		} else {
+-			return b.setActions(fm.getActions())
+-					.setBufferId(fm.getBufferId())
++			return b.setBufferId(fm.getBufferId())
+ 					.setCookie(fm.getCookie())
+ 					.setCookieMask(fm.getCookieMask()) // added in OF1.1
+ 					.setFlags(fm.getFlags())
+@@ -211,8 +207,7 @@
+ 					.setXid(fm.getXid())
+ 					.build();
+ 		} else {
+-			return b.setActions(fm.getActions())
+-					.setBufferId(fm.getBufferId())
++			return b.setBufferId(fm.getBufferId())
+ 					.setCookie(fm.getCookie())
+ 					.setCookieMask(fm.getCookieMask()) // added in OF1.1
+ 					.setFlags(fm.getFlags())
+diff -ruN old/src/main/java/net/floodlightcontroller/util/InstructionUtils.java new/src/main/java/net/floodlightcontroller/util/InstructionUtils.java
+--- old/src/main/java/net/floodlightcontroller/util/InstructionUtils.java	2017-01-24 16:59:29.776919808 +0000
++++ new/src/main/java/net/floodlightcontroller/util/InstructionUtils.java	2017-01-24 16:43:38.740926670 +0000
+@@ -241,12 +241,15 @@
+ 			return;
+ 		}
+ 
+-		OFFlowMod.Builder tmpFmb = OFFactories.getFactory(fmb.getVersion()).buildFlowModify();
+-		OFInstructionApplyActions.Builder ib = OFFactories.getFactory(fmb.getVersion()).instructions().buildApplyActions();
+-		ActionUtils.fromString(tmpFmb, inst, log);
+-		ib.setActions(tmpFmb.getActions());
+-		log.debug("Appending ApplyActions instruction: {}", ib.build());
+-		appendInstruction(fmb, ib.build());
++		ActionUtils.fromString(fmb, inst, log);
++
++		//OFFlowMod.Builder tmpFmb = OFFactories.getFactory(fmb.getVersion()).buildFlowModify();
++		//OFInstructionApplyActions.Builder ib = OFFactories.getFactory(fmb.getVersion()).instructions().buildApplyActions();
++		//ActionUtils.fromString(tmpFmb, inst, log);
++		//ib.setActions(tmpFmb.getActions());
++		//log.debug("Appending ApplyActions instruction: {}", ib.build());
++		//appendInstruction(fmb, ib.build());
++
+ 		log.debug("All instructions after append: {}", fmb.getInstructions());	}
+ 
+ 	///////////////////////////////////////////////////////////////////////////////////////////////////
+diff -ruN old/src/test/java/net/floodlightcontroller/core/internal/OFSwitchBaseTest.java new/src/test/java/net/floodlightcontroller/core/internal/OFSwitchBaseTest.java
+--- old/src/test/java/net/floodlightcontroller/core/internal/OFSwitchBaseTest.java	2017-01-24 16:59:29.776919808 +0000
++++ new/src/test/java/net/floodlightcontroller/core/internal/OFSwitchBaseTest.java	2017-01-24 15:11:45.815601059 +0000
+@@ -1408,6 +1408,8 @@
+         expect(switchManager.isCategoryRegistered(category)).andReturn(true);
+         switchManager.handleOutgoingMessage(sw, testMessage);
+         expectLastCall().once();
++        switchManager.handlePreOutgoingMessage(sw, testMessage);
++        expectLastCall().andReturn(testMessage).once();
+         replay(switchManager);
+         
+         sw.write(testMessage, category);
+@@ -1429,8 +1431,12 @@
+         expect(switchManager.isCategoryRegistered(LogicalOFMessageCategory.MAIN)).andReturn(true).times(6);
+         switchManager.handleOutgoingMessage(sw, fa);
+         expectLastCall().times(2);
++        switchManager.handlePreOutgoingMessage(sw, fa);
++        expectLastCall().andReturn(fa).times(2);
+         switchManager.handleOutgoingMessage(sw, fsr);
+         expectLastCall().times(4);
++        switchManager.handlePreOutgoingMessage(sw, fsr);
++        expectLastCall().andReturn(fsr).times(4);
+         replay(switchManager);
+ 
+ 		/* test master -- both messages should be written */
+diff -ruN old/src/test/java/net/floodlightcontroller/core/test/MockFloodlightProvider.java new/src/test/java/net/floodlightcontroller/core/test/MockFloodlightProvider.java
+--- old/src/test/java/net/floodlightcontroller/core/test/MockFloodlightProvider.java	2017-01-24 16:59:29.776919808 +0000
++++ new/src/test/java/net/floodlightcontroller/core/test/MockFloodlightProvider.java	2017-01-24 16:46:11.505072913 +0000
+@@ -47,6 +47,7 @@
+ import net.floodlightcontroller.core.IListener.Command;
+ import net.floodlightcontroller.core.IOFMessageListener;
+ import net.floodlightcontroller.core.IOFSwitch;
++import net.floodlightcontroller.core.IPreOutgoingOFMessageHandler;
+ import net.floodlightcontroller.core.RoleInfo;
+ import net.floodlightcontroller.core.internal.Controller.IUpdate;
+ import net.floodlightcontroller.core.internal.Controller.ModuleLoaderState;
+@@ -75,6 +76,7 @@
+ public class MockFloodlightProvider implements IFloodlightModule, IFloodlightProviderService {
+     private final static Logger log = LoggerFactory.getLogger(MockFloodlightProvider.class);
+     protected ConcurrentMap<OFType, ListenerDispatcher<OFType,IOFMessageListener>> listeners;
++    protected ConcurrentMap<OFType, ListenerDispatcher<OFType, IPreOutgoingOFMessageHandler>> preOutMessageHandlers;
+     protected ListenerDispatcher<HAListenerTypeMarker, IHAListener> haListeners;
+     private HARole role;
+     private final Set<IPv4Address> openFlowHostname = Collections.singleton(IPv4Address.of("127.0.0.1"));
+@@ -91,6 +93,7 @@
+     public MockFloodlightProvider(boolean useAsyncUpdates) {
+         listeners = new ConcurrentHashMap<OFType, ListenerDispatcher<OFType,
+                                    IOFMessageListener>>();
++        preOutMessageHandlers = new ConcurrentHashMap<>();
+         haListeners =
+                 new ListenerDispatcher<HAListenerTypeMarker, IHAListener>();
+         completionListeners = 
+@@ -125,6 +128,26 @@
+         }
+     }
+ 
++    @Override
++    public synchronized void addPreOutgoingOFMessageHandler(OFType type, IPreOutgoingOFMessageHandler handler) {
++        ListenerDispatcher<OFType, IPreOutgoingOFMessageHandler> ldd =
++            preOutMessageHandlers.get(type);
++        if (ldd == null) {
++            ldd = new ListenerDispatcher<>();
++            preOutMessageHandlers.put(type, ldd);
++        }
++        ldd.addListener(type, handler);
++    }
++
++    @Override
++    public void removePreOutgoingOFMessageHandler(OFType type, IPreOutgoingOFMessageHandler handler) {
++        ListenerDispatcher<OFType, IPreOutgoingOFMessageHandler> ldd =
++            preOutMessageHandlers.get(type);
++        if (ldd != null) {
++            ldd.removeListener(handler);
++        }
++    }
++
+     /**
+      * @return the listeners
+      */
+@@ -139,10 +162,25 @@
+         return Collections.unmodifiableMap(lers);
+     }
+ 
++    @Override
++    public Map<OFType, List<IPreOutgoingOFMessageHandler>> getPreOutgoingHandlers() {
++        Map<OFType, List<IPreOutgoingOFMessageHandler>> hers =
++            new HashMap<>();
++        for (Entry<OFType, ListenerDispatcher<OFType, IPreOutgoingOFMessageHandler>> e
++            : preOutMessageHandlers.entrySet()) {
++            hers.put(e.getKey(), e.getValue().getOrderedListeners());
++        }
++        return Collections.unmodifiableMap(hers);
++    }
++
+     public void clearListeners() {
+         this.listeners.clear();
+     }
+ 
++    public void clearPreOutHandlers() {
++        this.preOutMessageHandlers.clear();
++    }
++
+     public void dispatchMessage(IOFSwitch sw, OFMessage msg) {
+         dispatchMessage(sw, msg, new FloodlightContext());
+     }
+@@ -193,8 +231,37 @@
+     }
+ 
+     @Override
++    public OFMessage handlePreOutgoingMessage(IOFSwitch sw, OFMessage m) {
++        if (sw == null)
++            throw new NullPointerException("Switch must not be null");
++        if (m == null)
++            throw new NullPointerException("OFMessage must not be null");
++
++        OFMessage processed = m;
++        FloodlightContext bc = new FloodlightContext();
++
++        ListenerDispatcher<OFType, IPreOutgoingOFMessageHandler> ldd = preOutMessageHandlers.get(m.getType());
++        if (ldd != null) {
++            for (IPreOutgoingOFMessageHandler handler : ldd.getOrderedListeners()) {
++                if ((processed = handler.handlePreOutgoing(sw, processed, bc)) == null) {
++                    break;
++                }
++            }
++        }
++
++        return processed;
++    }
++
++    public void handlePreOutgoingMessages(IOFSwitch sw, List<OFMessage> msglist, FloodlightContext bc) {
++        for (OFMessage m:msglist) {
++            handlePreOutgoingMessage(sw, m);
++        }
++    }
++
++    @Override
+     public void run() {
+         logListeners();
++        logPreOutgoingHandlers();
+         if (useAsyncUpdates)
+             executorService = Executors.newSingleThreadExecutor();
+     }
+@@ -364,6 +431,24 @@
+                 sb.append(",");
+             }
+             log.debug(sb.toString());
++        }
++    }
++
++    private void logPreOutgoingHandlers() {
++        for (Map.Entry<OFType, ListenerDispatcher<OFType, IPreOutgoingOFMessageHandler>> entry
++            : preOutMessageHandlers.entrySet()) {
++            OFType type = entry.getKey();
++            ListenerDispatcher<OFType, IPreOutgoingOFMessageHandler> ldd = entry.getValue();
++
++            StringBuilder sb = new StringBuilder();
++            sb.append("Pre-Outgoing OFHandlers for ");
++            sb.append(type);
++            sb.append(": ");
++            for (IPreOutgoingOFMessageHandler h : ldd.getOrderedListeners()) {
++                sb.append(h.getName());
++                sb.append(",");
++            }
++            log.debug(sb.toString());
+         }
+     }
+ 
+diff -ruN old/src/test/java/net/floodlightcontroller/core/test/MockSwitchManager.java new/src/test/java/net/floodlightcontroller/core/test/MockSwitchManager.java
+--- old/src/test/java/net/floodlightcontroller/core/test/MockSwitchManager.java	2017-01-24 16:59:29.776919808 +0000
++++ new/src/test/java/net/floodlightcontroller/core/test/MockSwitchManager.java	2017-01-24 15:11:45.815601059 +0000
+@@ -97,6 +97,12 @@
+     	
+     }
+ 
++    @Override
++    public OFMessage handlePreOutgoingMessage(IOFSwitch sw, OFMessage m) {
++        // do nothing
++        return null;
++    }
++
+     public void setSwitchHandshakeHandlers(Map<DatapathId, OFSwitchHandshakeHandler> handlers) {
+         this.switchHandlers = handlers;
+     }
+--- old/build.xml	2017-01-24 15:38:27.737752846 +0000
++++ new/build.xml	2017-01-24 17:18:30.689644066 +0000
+@@ -41,7 +41,9 @@
+     <property name="docs" location="${target}/docs"/>
+     <property name="main-class" value="net.floodlightcontroller.core.Main"/>
+     <property name="floodlight-jar" location="${target}/floodlight.jar"/>
++    <property name="floodlight-src-jar" location="${target}/floodlight-sources.jar"/>
+     <property name="floodlight-test-jar" location="${target}/floodlight-test.jar"/>
++    <property name="floodlight-test-src-jar" location="${target}/floodlight-test-sources.jar"/>
+     <property name="thrift.dir" value="${basedir}/src/main/thrift"/>
+     <property name="thrift.out.dir" value="lib/gen-java"/>
+     <property name="ant.build.javac.source" value="1.8"/>
+@@ -277,6 +279,15 @@
+         </jar>
+     </target>
+ 
++    <target name="dist-src" depends="init">
++        <jar destfile="${floodlight-src-jar}">
++            <fileset dir="${source}"/>
++        </jar>
++        <jar destfile="${floodlight-test-src-jar}">
++            <fileset dir="${source-test}"/>
++        </jar>
++    </target>
++
+     <target name="deb" depends="dist">
+       <taskdef name="deb" 
+ 	       classname="org.vafer.jdeb.ant.DebAntTask" 

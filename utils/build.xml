@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+
+<project default="compile" basedir="." name="varanus-utils">
+
+    <!--
+        When this file is included the basedir property is ignored, this hack is required to retrieve it.
+    -->
+    <dirname property="utils.basedir" file="${ant.file.varanus-utils}" />
+
+    <property name="utils.target" location="${utils.basedir}/target" />
+    <property name="utils.build" location="${utils.target}/bin" />
+
+    <property name="utils.src" location="${utils.basedir}/src/main/java" />
+
+    <property name="ant.build.javac.source" value="1.8" />
+    <property name="ant.build.javac.target" value="1.8" />
+
+    <include file="${utils.basedir}/../common-lib/build.xml" as="common" />
+
+    <patternset id="utils-common-lib">
+        <include name="commons-math3-3.6.1.jar" />
+        <include name="findbugs-annotations-2.0.1.jar" />
+        <include name="guava-13.0.1.jar" />
+        <include name="jackson-core-2.4.4.jar" />
+        <include name="jackson-databind-2.4.4.jar" />
+        <include name="jgrapht-core-1.0.0-SNAPSHOT.jar" />
+        <include name="netty-all-4.0.31.Final.jar" />
+        <include name="openflowj-2.0.0-SNAPSHOT.jar" />
+        <include name="slf4j-api-1.6.4.jar" />
+    </patternset>
+
+    <path id="utils-classpath">
+        <fileset dir="${common.lib}">
+            <patternset refid="utils-common-lib" />
+        </fileset>
+    </path>
+
+    <target name="init">
+        <mkdir dir="${utils.build}" />
+    </target>
+
+    <target name="compile" depends="init">
+        <javac includeAntRuntime="false"
+               classpathref="utils-classpath"
+               debug="true"
+               srcdir="${utils.src}"
+               destdir="${utils.build}">
+            <compilerarg value="-Xlint" />
+        </javac>
+    </target>
+
+    <target name="clean">
+        <delete dir="${utils.target}" />
+    </target>
+
+</project>
+

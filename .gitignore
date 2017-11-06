@@ -1,0 +1,5 @@
+*/target
+**/*.pyc
+network-visualiser/catalina/logs
+network-visualiser/catalina/webapps/visualiser
+network-visualiser/catalina/work

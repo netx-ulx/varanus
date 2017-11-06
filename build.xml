@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+
+<project default="help" basedir="." name="varanus">
+
+    <include file="sdncontroller/build.xml" as="sdncontroller" />
+    <include file="collector/build.xml" as="collector" />
+    <include file="xml-proxy/build.xml" as="xmlproxy" />
+
+    <target name="help">
+        <echo>Specify one of these targets:
+    compile-sdncontroller : compiles the SDN Controller application
+    compile-collector     : compiles the Collector application
+    compile-xmlproxy      : compiles the XML Proxy application
+    compile-all           : compiles all applications
+
+    pack-sdncontroller    : compiles and packs the SDN Controller into a jar file
+    pack-collector        : compiles and packs the Collector into a jar file
+    pack-xmlproxy         : compiles and packs the XML Proxy into a jar file
+    pack-all              : compiles and packs all applications
+
+    clean-sdncontroller   : cleans SDN Controller built files and directories
+    clean-collector       : cleans Collector built files and directories
+    clean-xmlproxy        : cleans XML Proxy built files and directories
+    clean-all             : cleans all applications
+        </echo>
+    </target>
+
+    <target name="compile-sdncontroller" depends="sdncontroller.compile" />
+    <target name="compile-collector" depends="collector.compile" />
+    <target name="compile-xmlproxy" depends="xmlproxy.compile" />
+    <target name="compile-all" depends="compile-sdncontroller,compile-collector,compile-xmlproxy" />
+
+    <target name="pack-sdncontroller" depends="sdncontroller.pack" />
+    <target name="pack-collector" depends="collector.pack" />
+    <target name="pack-xmlproxy" depends="xmlproxy.pack" />
+    <target name="pack-all" depends="pack-sdncontroller,pack-collector,pack-xmlproxy" />
+
+    <target name="clean-sdncontroller" depends="sdncontroller.clean" />
+    <target name="clean-collector" depends="collector.clean" />
+    <target name="clean-xmlproxy" depends="xmlproxy.clean" />
+    <target name="clean-all" depends="clean-sdncontroller,clean-collector,clean-xmlproxy" />
+
+</project>
+
