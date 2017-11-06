@@ -28,7 +28,7 @@ $ cd &lt;repository directory&gt;
 $ ant pack-all
 </pre></big>
 
-Open a terminal and launch the network manager:
+Open a terminal and launch the network manager as root:
 <big><pre>
 $ cd &lt;repository directory&gt;
 $ ./demo/launch\_network.sh
