@@ -1,9 +1,9 @@
 ## varanus: _A set of applications for providing resilient communications in a Software-Defined Network_
 
-#### Overview
+### Overview
 TODO
 
-#### Requisites
+### Requisites
 For all applications:
 - 64-bit Linux-based operating system with a bash shell
 
@@ -21,7 +21,7 @@ For the network-visualiser application:
 - Java (8 or higher) for running the tomcat server and for building and running the xml-proxy
 - Web browser with enabled JavaScript for interacting with the application
 
-#### Demo instructions
+### Demo instructions
 Build all Java applications:
 <big><pre>
 $ cd &lt;repository directory&gt;
@@ -41,7 +41,7 @@ $ ./demo/launch\_visualiser.sh
 </pre></big>
 
 Open a web browser and go to 'localhost:8080/visualiser' (default password is "password").
-#### Contributors
+### Contributors
 Ricardo Fonseca
 
 Eric Vial
