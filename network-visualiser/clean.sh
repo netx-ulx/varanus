@@ -15,7 +15,8 @@ msg() {
 
 LOCAL_DIR="$(readlink -f "$(dirname "$0")")"
 if cd "$LOCAL_DIR/catalina"; then
-    rm -f "./logs"/*
+    rm -rf "./logs"
+    rm -rf "./temp"
     rm -rf "./webapps/visualiser"
     rm -rf "./work"
 fi
