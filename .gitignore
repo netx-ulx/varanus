@@ -1,5 +1,11 @@
 */target
+.settings
+.project
+.classpath
+/bin/
+PersistentDB~
 **/*.pyc
+.pydevproject
 network-visualiser/catalina/logs
 network-visualiser/catalina/temp
 network-visualiser/catalina/webapps/visualiser
