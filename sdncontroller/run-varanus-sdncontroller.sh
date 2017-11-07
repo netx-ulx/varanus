@@ -8,8 +8,7 @@ CONFIG_DIR="${BASE_DIR}/config"
 
 SDNCONT_JAR="${TARGET_DIR}/varanus-sdncontroller.jar"
 FLOOD_JAR="${LIB_DIR}/floodlight.jar"
-LOGBACK_FILE="${CONFIG_DIR}/varanus-sdncontroller-logback.xml"
-#PROPS_FILE="${CONFIG_DIR}/varanus-sdncontroller.properties"
+LOGBACK_FILE="${CONFIG_DIR}/sdncontroller-logback.xml"
 PROPS_FILE="${CONFIG_DIR}/"
 
 # Set JVM options

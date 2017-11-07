@@ -8,8 +8,7 @@ CONFIG_DIR="${BASE_DIR}/config"
 
 COLL_JAR="${TARGET_DIR}/varanus-collector.jar"
 JPCAP_LIB="${LIB_DIR}/jnetpcap-1.4.r1425"
-LOGBACK_FILE="${CONFIG_DIR}/varanus-collector-logback.xml"
-#PROPS_FILE="${CONFIG_DIR}/varanus-collector.properties"
+LOGBACK_FILE="${CONFIG_DIR}/collector-logback.xml"
 PROPS_FILE="${CONFIG_DIR}/"
 
 

@@ -12,8 +12,8 @@ class VaranusTopo( object ):
     """ Helper class for setting up varanus topology """
 
     _SAMPLING_OFPORT = 32768
-    _SDNCONTROLLER_CFG_FILE = 'sdncontroller/config/1-varanus-sdncontroller.properties'
-    _COLLECTOR_CFG_FILE = 'collector/config/1-varanus-collector.properties'
+    _SDNCONTROLLER_CFG_FILE = 'sdncontroller/config/1-autocfg-sdncontroller.properties'
+    _COLLECTOR_CFG_FILE = 'collector/config/1-autocfg-collector.properties'
 
     @staticmethod
     def __build_arg_parser():
