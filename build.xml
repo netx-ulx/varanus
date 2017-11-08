@@ -6,22 +6,27 @@
     <include file="collector/build.xml" as="collector" />
     <include file="xml-proxy/build.xml" as="xmlproxy" />
 
+    <property name="netmanager.clean" location="${basedir}/network-manager/clean.sh" />
+    <property name="netvisualiser.clean" location="${basedir}/network-visualiser/clean.sh" />
+
     <target name="help">
         <echo>Specify one of these targets:
-    compile-sdncontroller : compiles the SDN Controller application
-    compile-collector     : compiles the Collector application
-    compile-xmlproxy      : compiles the XML Proxy application
-    compile-all           : compiles all applications
+    compile-sdncontroller : compiles the SDN Controller
+    compile-collector     : compiles the Collector
+    compile-xmlproxy      : compiles the XML Proxy
+    compile-all           : compiles the SDN Controller, Collector and XML Proxy
 
-    pack-sdncontroller    : compiles and packs the SDN Controller into a jar file
-    pack-collector        : compiles and packs the Collector into a jar file
-    pack-xmlproxy         : compiles and packs the XML Proxy into a jar file
-    pack-all              : compiles and packs all applications
+    pack-sdncontroller    : compiles and packs into a jar file the SDN Controller
+    pack-collector        : compiles and packs into a jar file the Collector
+    pack-xmlproxy         : compiles and packs into a jar file the XML Proxy
+    pack-all              : compiles and packs into jar files the SDN Controller, Collector and XML Proxy
 
-    clean-sdncontroller   : cleans SDN Controller built files and directories
-    clean-collector       : cleans Collector built files and directories
-    clean-xmlproxy        : cleans XML Proxy built files and directories
-    clean-all             : cleans all applications
+    clean-sdncontroller   : removes any built files or directories of the SDN Controller
+    clean-collector       : removes any built files or directories of the Collector
+    clean-xmlproxy        : removes any built files or directories of the XML Proxy
+    clean-netmanager      : removes any built files or directories of the Network Manager
+    clean-netvisualiser   : removes any built files or directories of the Network Visualiser
+    clean-all             : removes any built files or directories of all applications
         </echo>
     </target>
 
@@ -38,7 +43,13 @@
     <target name="clean-sdncontroller" depends="sdncontroller.clean" />
     <target name="clean-collector" depends="collector.clean" />
     <target name="clean-xmlproxy" depends="xmlproxy.clean" />
-    <target name="clean-all" depends="clean-sdncontroller,clean-collector,clean-xmlproxy" />
+    <target name="clean-netmanager">
+        <exec executable="${netmanager.clean}" />
+    </target>
+    <target name="clean-netvisualiser">
+        <exec executable="${netvisualiser.clean}" />
+    </target>
+    <target name="clean-all" depends="clean-sdncontroller,clean-collector,clean-xmlproxy,clean-netmanager,clean-netvisualiser" />
 
 </project>
 

@@ -14,12 +14,9 @@ msg() {
 }
 
 LOCAL_DIR="$(readlink -f "$(dirname "$0")")"
-if cd "$LOCAL_DIR/catalina"; then
+if cd "$LOCAL_DIR"; then
     msg "Cleaning built files..."
-    rm -rfv "./logs"
-    rm -rfv "./temp"
-    rm -rfv "./webapps/visualiser"
-    rm -rfv "./work"
+    find . -name "*.pyc" -exec rm -vf {} \;
 else
     abort "Error: could not clean built files"
 fi
