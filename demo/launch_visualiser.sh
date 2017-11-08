@@ -19,7 +19,7 @@ if ! [ -d "$LOCAL_DIR/../xml-proxy/target" ]; then
 fi
 
 DAEMONIZER="$LOCAL_DIR/../utils/bin/daemonizer.sh"
-XMLPROXY_RUN="$LOCAL_DIR/../xml-proxy/run-varanus-xml-proxy.sh"
+XMLPROXY_RUN="$LOCAL_DIR/../xml-proxy/run-xmlproxy.sh"
 VISUALISER_START="$LOCAL_DIR/../network-visualiser/start.sh"
 VISUALISER_STOP="$LOCAL_DIR/../network-visualiser/stop.sh"
 

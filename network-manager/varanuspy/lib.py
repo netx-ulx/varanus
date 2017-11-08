@@ -237,7 +237,7 @@ class SDNControllerUtils( object ):
     def _get_sdncontroller_script( varanus_home ):
         return os.path.join( varanus_home, \
                             'sdncontroller', \
-                            'run-varanus-sdncontroller.sh' )
+                            'run-sdncontroller.sh' )
 
 
 
@@ -426,7 +426,7 @@ class CollectorUtils( object ):
     def _get_collector_script( varanus_home ):
         return os.path.join( varanus_home, \
                             'collector', \
-                            'run-varanus-collector.sh' )
+                            'run-collector.sh' )
 
 
 
