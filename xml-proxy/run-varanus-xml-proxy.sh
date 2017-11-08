@@ -7,8 +7,8 @@ LIB_DIR="${BASE_DIR}/lib"
 CONFIG_DIR="${BASE_DIR}/config"
 
 XML_PROXY_JAR="${TARGET_DIR}/varanus-xmlproxy.jar"
-LOGBACK_FILE="${CONFIG_DIR}/varanus-xmlproxy-logback.xml"
-PROPS_FILE="${CONFIG_DIR}/varanus-xmlproxy.properties"
+LOGBACK_FILE="${CONFIG_DIR}/xmlproxy-logback.xml"
+PROPS_FILE="${CONFIG_DIR}/default-xmlproxy.properties"
 
 
 # Set JVM options
