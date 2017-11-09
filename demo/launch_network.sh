@@ -20,7 +20,7 @@ if ! [ -d "$LOCAL_DIR/../collector/target" -a -d "$LOCAL_DIR/../sdncontroller/ta
     abort "Must build collector and sdncontroller applications first"
 fi
 
-MININET_RUN="$LOCAL_DIR/../network-manager/run_mininet.py"
+NETMANAGER_RUN="$LOCAL_DIR/../network-manager/run_netmanager.py"
 msg "Launching network manager..."
-"$MININET_RUN" --arp --config demo --autocfg
+"$NETMANAGER_RUN" --arp --config demo --autocfg
 

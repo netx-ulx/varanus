@@ -16,8 +16,8 @@ msg() {
 [ $EUID -eq 0 ] || abort "Must run as root"
 
 LOCAL_DIR="$(readlink -f "$(dirname "$0")")"
-MININET_RUN="$LOCAL_DIR/../network-manager/run_mininet.py"
+NETMANAGER_RUN="$LOCAL_DIR/../network-manager/run_netmanager.py"
 
 msg "Cleaning up network manager..."
-"$MININET_RUN" --config demo --cleanlocal
+"$NETMANAGER_RUN" --config demo --cleanlocal
 
