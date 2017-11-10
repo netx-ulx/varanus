@@ -1,4 +1,5 @@
 import argparse
+from collections import OrderedDict
 import json
 import os
 import subprocess
@@ -60,6 +61,8 @@ class VaranusTopo( object ):
         self.switches = {}     # NodeConfig mapped by name
         self.hosts = {}        # NodeConfig mapped by name
         self.collectors = {}   # NodeConfig mapped by name
+
+        self.host_connections = OrderedDict() # list of host names orderly mapped by host name
 
 
     # ================ CONTROLLERS ================
@@ -188,6 +191,16 @@ class VaranusTopo( object ):
         sw_port_cfg = NodeUtils.get_generic_phy_port_cfg( sw_portname, sw_portnum )
 
         self.__add_host_link( h_name, h_port_cfg, sw_name, sw_port_cfg )
+
+
+    def add_host_connection( self, src_h_name, dest_h_name ):
+        src_h_name = as_oneof( src_h_name, self.hosts.keys(), valname='src_h_name', containername='host names' )
+        dest_h_name = as_oneof( dest_h_name, self.hosts.keys(), valname='dest_h_name', containername='host names' )
+
+        if src_h_name != dest_h_name:
+            src_conns = self.host_connections.setdefault( src_h_name, [] )
+            if dest_h_name not in src_conns:
+                src_conns.append( dest_h_name )
 
 
     # ================ COLLECTORS ================
@@ -475,7 +488,7 @@ class VaranusTopo( object ):
 
         f.write( 'net.varanus.sdncontroller.flowdiscovery.FlowDiscoveryModule.staticFlowedConnections=' )
         if multiline: f.write( '\n' )
-        VaranusTopo.__dump_json( f, self.__get_host_connections(), multiline=multiline )
+        VaranusTopo.__dump_json( f, self.__get_all_flowed_connections(), multiline=multiline )
         f.write( '\n' )
 
         f.write( 'net.varanus.sdncontroller.alias.AliasModule.switchAliases=' )
@@ -506,11 +519,11 @@ class VaranusTopo( object ):
         return dict( ( '{:#x}'.format( s.dpid ), name ) for name, s in self.switches.iteritems() )
 
 
-    def __get_host_connections( self ):
+    def __get_all_flowed_connections( self ):
         conns = []
-        for h1 in self.hosts.itervalues():
+        for h1_name, h1 in self.hosts.iteritems():
             for h1p in VaranusTopo.__get_peered_ports( h1 ):
-                for h2 in filter( lambda h : h is not h1 , self.hosts.itervalues() ):
+                for h2 in self.__get_connected_hosts( h1_name ):
                     for h2p in VaranusTopo.__get_peered_ports( h2 ):
                         p1 = h1p.get_peer()
                         p2 = h2p.get_peer()
@@ -525,6 +538,10 @@ class VaranusTopo( object ):
         return dict( ( str( c.cid ), VaranusTopo.__get_ifaces_mapping( c ) ) for c in self.collectors.itervalues() )
 
 
+    def __get_connected_hosts( self, h_name ):
+        return ( self.hosts[name] for name in self.host_connections.get( h_name, () ) )
+
+
     @staticmethod
     def __get_ifaces_mapping( node ):
         return dict( ( '{:#x}'.format( p.get_peer().node.dpid ), p.name ) for p in VaranusTopo.__get_peered_ports( node ) )
@@ -532,7 +549,7 @@ class VaranusTopo( object ):
 
     @staticmethod
     def __get_peered_ports( node ):
-        return filter( lambda p : p.has_peer(), node.get_ports() )
+        return ( p for p in node.get_ports() if p.has_peer() )
 
 
     @staticmethod

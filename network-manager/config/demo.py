@@ -42,6 +42,11 @@ def pre_start_config( mr, extra_args, local_varanus_home ):
     topo.add_ring_local_vir_host( 'Cntrl_Center', 1, '192.168.10.103/24', 1, 'Core5' )
     topo.add_ring_local_vir_host( 'Attacker', 1, '192.168.10.104/24', 1, 'A1', hidden=True )
 
+    topo.add_host_connection( 'SCADA_Client', 'Cntrl_Center' )
+    topo.add_host_connection( 'RTU', 'Cntrl_Center' )
+    topo.add_host_connection( 'Cntrl_Center', 'SCADA_Client' )
+    topo.add_host_connection( 'Cntrl_Center', 'RTU' )
+
 
     # Collectors
     topo.add_ring_local_vir_collector( 'c1', 1, 1 )
